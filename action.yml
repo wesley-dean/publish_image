@@ -29,6 +29,21 @@ inputs:
     required: false
     default: false
 
+  is_scheduled:
+    description: "Whether or not this is a scheduled run"
+    required: false
+    default: false
+
+  schedule_pattern:
+    description: "Handlebars-formatted string to use for the scheduled builds"
+    required: false
+    default: "nightly"
+
+  schedule_date_format:
+    description: "Date format to use for the scheduled builds"
+    required: false
+    default: "YYYYMMDD"
+
   platforms:
     description: "Platforms to build for"
     required: false
@@ -185,6 +200,9 @@ runs:
         inputs_context: ${{ inputs.context }}
         inputs_dockerfile: ${{ inputs.dockerfile }}
         inputs_force_release: ${{ inputs.force_release }}
+        inputs_is_scheduled: ${{ inputs.is_scheduled }}
+        inputs_schedule_pattern: ${{ inputs.schedule_pattern }}
+        inputs_schedule_date_format: ${{ inputs.schedule_date_format }}
 
         inputs_dockerhub_username: ${{ inputs.dockerhub_username }}
         inputs_dockerhub_token: ${{ inputs.dockerhub_token }}
@@ -227,6 +245,9 @@ runs:
           dockerfile="${inputs_dockerfile}"
 
           force_release="${inputs_force_release}"
+          is_scheduled="${inputs_is_scheduled}"
+          schedule_pattern="${inputs_schedule_pattern}"
+          schedule_date_format="${inputs_schedule_date_format}"
 
           dockerhub_username="${inputs_dockerhub_username}"
           dockerhub_token="${inputs_dockerhub_token}"
@@ -264,12 +285,24 @@ runs:
           ok_to_build="false"
 
           echo -n "is_release="
-          if [[ "${github_ref}" =~ refs/tags/v[1-9].* ]] \
-          || [[ "${force_release:-false}" =~ [YyTt].* ]] ; then
+          if [[ "${force_release:-false}" =~ [YyTt].* ]] \
+          || ( [[ "${github_ref}" =~ refs/tags/v[1-9].* ]] \
+             && [[ "${is_scheduled:-false}" =~ [NnFf].* ]] ) ; then
             echo "true"
           else
             echo "false"
           fi
+
+          echo -n "is_scheduled="
+          if [[ "${is_scheduled:-false}" =~ [YyTt].* ]] \
+          && [[ ! "${force_release:-false}" =~ [YyTt].* ]] ; then
+            echo "true"
+          else
+            echo "false"
+          fi
+
+          echo "schedule_pattern=${schedule_pattern:-nightly}"
+          echo "schedule_date_format=${schedule_date_format:-YYYYMMDD}"
 
           echo "platforms=${platforms:-linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6}"
           echo "context=${context:-.}"
@@ -452,7 +485,9 @@ runs:
           type=semver,pattern={{version}},enable=${{ steps.customvars.outputs.is_release == 'true' }}
           type=semver,pattern={{major}},enable=${{ steps.customvars.outputs.is_release == 'true' }}
           type=semver,pattern={{major}}.{{minor}},enable=${{ steps.customvars.outputs.is_release == 'true' }}
-          type=edge,branch=main
+          type=schedule,pattern=${{ steps.customvars.outputs.schedule_pattern }},enable=${{ steps.customvars.outputs.is_scheduled == 'true' }}
+          type=schedule,pattern={{ date '${{ steps.customvars.outputs.schedule_date_format }}' }},enable=${{ steps.customvars.outputs.is_scheduled == 'true' }}
+          type=edge,branch=main,enable=${{ steps.customvars.outputs.is_scheduled == 'false' }}
           type=sha
           type=sha,format=long
       env:

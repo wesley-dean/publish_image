@@ -178,6 +178,12 @@ The following inputs are available:
     `${{ github.ref }}` to get the ref that triggered the action. **REQUIRED**
   - force_release: If `true`, the action will treat any build as a release and
     tag the image with the appropriate tags.  Default: `false`.
+  - is_scheduled: If `true`, the action will treat the build as a scheduled
+    build and tag the image with the appropriate tags.  Default: `false`.
+  - schedule_pattern: the string to use for a tag for scheduled images.
+    Default: `nightly`.
+  - schedule_date_format: the date format to use for the scheduled image tag.
+    Default: `YYYYMMDD`.
 - **DockerHub**
   - dockerhub_image: The name of the image on DockerHub. Default:
     `{ dockerhub username }/{ repository name }`.
@@ -241,6 +247,38 @@ The following outputs are available:
   - custom_registry: `true` if the image was published to a custom registry,
     `false` otherwise.
   - custom_image: The name of the image on the custom registry.
+
+## Image Tags
+
+### All Builds
+
+All builds -- release, scheduled, or otherwise -- will be tagged with the short
+and long SHA hashes of the commit that triggered the build.  The short SHA is
+the first 7 characters of the SHA hash, and the long SHA is the full SHA hash.
+
+### Release Builds
+
+When `force_release` is `true` or when the tag associated with the build starts
+with `v[1-9]`, the action will consider this a "release" build and will tag the
+image with semver tags plus the `latest` tag.
+
+### Scheduled Builds
+
+When `is_scheduled` is `true`, the action will consider this a "scheduled"
+build and will tag the image with the `schedule_pattern` and give it a date
+formatted with the `schedule_date_format` format.
+
+The default `schedule_pattern` is `nightly`, so the image will be tagged with
+`nightly`.
+
+The default `schedule_date_format` is `YYYYMMDD`, so the image will be tagged
+with the result of calling `date 'YYYYMMDD'`.
+
+### Non-scheduled Builds
+
+When a build is not a scheduled build (e.g., it's a release build), the action
+will add the `edge` tag to the image.  The `edge` tag is used to indicate that
+the image is a "development" build and is not considered a release.
 
 ## Examples
 
@@ -411,12 +449,12 @@ Want to be sure?  Check the code.  It's all there.  Here's a link:
 
 [https://github.com/wesley-dean/publish_container/blob/main/action.yml](https://github.com/wesley-dean/publish_container/blob/main/action.yml)
 
-#### Release tags
+#### Release Tags
 
 Images associated with releases are given the following tags:
 
-- latest
-- edge
+- `latest`
+- `edge`
 - `{major}.{minor}.{patch}`
 - `{major}.{minor}`
 - `{major}`
@@ -435,13 +473,49 @@ So, if the tag is `v1.2.3`, the image will be tagged with the following:
 
 (the SHA hashes are made up)
 
-#### Non-release tags
+### Scheduled Tags
 
-Images that are not associated with a release are given the following tags:
+Images associated with scheduled builds are given the following tags:
 
-- edge
+- `nightly` (or whatever the `schedule_pattern` is set to)
+- `{{ date 'YYYYMMDD' }}` (or whatever the `schedule_date_format` is set to)
 - `{short sha}`
 - `{long sha}`
+
+The `schedule_date_format` is the Moment.js date format string to use.  The
+many strings Moment.js supports are documented here:
+
+[Format](https://momentjs.com/docs/#/displaying/format/)
+
+Dates are specified by the UTC standard.
+
+So, if the schedule pattern is `nightly` and the date format is `YYYYMMDD`,
+the image will be tagged with the following (assuming the date is 5th of April
+in the year 2025):
+
+- nightly
+- 20250405
+- abc123
+- abc123def456aaa7890123456789abcdef012345
+
+(the SHA hashes are made up)
+
+#### Non-release, non-scheduled tags
+
+Images that are not associated with a release and are not scheduled will given
+the following tags:
+
+- `edge`
+- `{short sha}`
+- `{long sha}`
+
+So, a non-release, non-scheduled image will be tagged with the following:
+
+- edge
+- abc123
+- abc123def456aaa7890123456789abcdef012345
+
+(the SHA hashes are made up)
 
 ### Image descriptions
 

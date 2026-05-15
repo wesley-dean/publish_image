@@ -7,4 +7,4 @@ If you're having problems running this action, please verify that:
 
 If you're still having issues, please open a new issue in this repository:
 
-[Issue tracker](https://github.com/wesley-dean/publish_container/issues/)
+[Issue tracker](https://github.com/wesley-dean/publish_image/issues/)

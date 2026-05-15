@@ -60,7 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement via an
-[issue](https://github.com/wesley-dean/publish_container/issues/).
+[issue](https://github.com/wesley-dean/publish_image/issues/).
 
 All complaints will be reviewed and investigated promptly and fairly.
 

@@ -1,8 +1,8 @@
 # Publish Image to Various Registries
 
-[![Dependabot Updates](https://github.com/wesley-dean/publish_container/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/wesley-dean/publish_container/actions/workflows/dependabot/dependabot-updates)
-[![MegaLinter](https://github.com/wesley-dean/publish_container/actions/workflows/megalinter.yml/badge.svg)](https://github.com/wesley-dean/publish_container/actions/workflows/megalinter.yml)
-[![Scorecard supply-chain security](https://github.com/wesley-dean/publish_container/actions/workflows/scorecard.yml/badge.svg)](https://github.com/wesley-dean/publish_container/actions/workflows/scorecard.yml)
+[![Dependabot Updates](https://github.com/wesley-dean/publish_image/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/wesley-dean/publish_image/actions/workflows/dependabot/dependabot-updates)
+[![MegaLinter](https://github.com/wesley-dean/publish_image/actions/workflows/megalinter.yml/badge.svg)](https://github.com/wesley-dean/publish_image/actions/workflows/megalinter.yml)
+[![Scorecard supply-chain security](https://github.com/wesley-dean/publish_image/actions/workflows/scorecard.yml/badge.svg)](https://github.com/wesley-dean/publish_image/actions/workflows/scorecard.yml)
 
 ## Description
 
@@ -278,7 +278,7 @@ jobs:
           depth: 0
           tags: true
       - name: Build and Publish Image
-        uses: wesley-dean/publish_container@v1
+        uses: wesley-dean/publish_image@v1
         with:
           # pass the basic data for the build
           github_ref: ${{ github.ref }}
@@ -319,7 +319,7 @@ jobs:
           depth: 0
           tags: true
       - name: Build and Publish Image
-        uses: wesley-dean/publish_container@v1
+        uses: wesley-dean/publish_image@v1
         with:
 
           # basic inputs
@@ -409,7 +409,7 @@ environment variables.
 
 Want to be sure?  Check the code.  It's all there.  Here's a link:
 
-[https://github.com/wesley-dean/publish_container/blob/main/action.yml](https://github.com/wesley-dean/publish_container/blob/main/action.yml)
+[https://github.com/wesley-dean/publish_image/blob/main/action.yml](https://github.com/wesley-dean/publish_image/blob/main/action.yml)
 
 #### Release tags
 

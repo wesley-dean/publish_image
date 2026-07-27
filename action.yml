@@ -460,7 +460,7 @@ runs:
 
     # Build and push images
     - name: Build and push
-      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # pin@v7.1.0
+      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # pin@v7.3.0
       if: ${{ steps.customvars.outputs.ok_to_build == 'true' }}
       id: build-push
       with:

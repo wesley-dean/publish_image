@@ -1,4 +1,8 @@
 FROM scratch
+# Metadata-only fixture; no runnable process exists to probe.
+HEALTHCHECK NONE
+# Nonroot user even for the inert inspect-only test image.
+USER 65532:65532
 ARG SOURCE_COMMIT
 ARG RELEASE_VERSION
 ARG PRODUCER_SHA256

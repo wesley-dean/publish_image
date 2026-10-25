@@ -557,7 +557,8 @@ runs:
         # Load no-push single-platform builds for real local acceptance checks.
         load: ${{ inputs.push == 'false' && inputs.platforms == 'linux/amd64' }}
         build-args: ${{ inputs.build_args }}
-        sbom: true
+        # The local Docker exporter used by no-push acceptance cannot retain SBOM attestations.
+        sbom: ${{ inputs.push }}
         context: ${{ steps.customvars.outputs.context }}
         file: ${{ steps.customvars.outputs.dockerfile }}
         platforms: ${{ steps.customvars.outputs.platforms }}

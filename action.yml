@@ -187,6 +187,9 @@ outputs:
     description: "Custom registry image name"
     value: ${{ steps.customvars.outputs.custom_image }}
 
+  tags:
+    description: "Resulting nonsecret, newline-separated image tags"
+    value: ${{ steps.verifiedmeta.outputs.tags || steps.meta.outputs.tags }}
   digest:
     description: "Nonsecret Buildx build digest"
     value: ${{ steps.build-push.outputs.digest }}
@@ -551,6 +554,8 @@ runs:
       id: build-push
       with:
         push: ${{ inputs.push }}
+        # Load no-push single-platform builds for real local acceptance checks.
+        load: ${{ inputs.push == 'false' && inputs.platforms == 'linux/amd64' }}
         build-args: ${{ inputs.build_args }}
         sbom: true
         context: ${{ steps.customvars.outputs.context }}

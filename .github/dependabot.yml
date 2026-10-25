@@ -9,6 +9,9 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    # Reduce exposure to newly published or compromised action releases.
+    cooldown:
+      default-days: 7
     groups:
       minor-and-patch:
         applies-to: version-updates

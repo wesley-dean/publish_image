@@ -564,7 +564,8 @@ runs:
         platforms: ${{ steps.customvars.outputs.platforms }}
         tags: ${{ steps.verifiedmeta.outputs.tags || steps.meta.outputs.tags }}
         labels: ${{ steps.verifiedmeta.outputs.labels || steps.meta.outputs.labels }}
-        annotations: ${{ steps.verifiedmeta.outputs.annotations || steps.meta.outputs.annotations }}
+        # OCI annotations are emitted for pushed manifests, not Docker local exporter.
+        annotations: ${{ inputs.push == 'true' && (steps.verifiedmeta.outputs.annotations || steps.meta.outputs.annotations) || '' }}
 
     # Update image descriptions (DockerHub, Quay, and Harbor only)
     - name: update DockerHub description

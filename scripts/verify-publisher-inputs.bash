@@ -31,6 +31,22 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   key="${line%%=*}"
   [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || fail 'invalid build_args key'
   lower="${key,,}"
+  # When these widely used identity args are present in verified mode,
+  # they must match the verified metadata exactly; other generic callers
+  # retain the ability to omit these application-specific build args.
+  if [[ -n "$ref" ]]; then
+    value="${line#*=}"
+    case "$key" in
+      SOURCE_COMMIT)
+        [[ "$value" == "$sha" ]] ||
+          fail 'SOURCE_COMMIT build argument differs from verified source SHA'
+        ;;
+      RELEASE_VERSION)
+        [[ "$value" == "${ref#refs/tags/v}" ]] ||
+          fail 'RELEASE_VERSION build argument differs from verified tag'
+        ;;
+    esac
+  fi
   case "$lower" in
     *secret*|*token*|*password*|*credential*|*passwd*|*private*|*access_key*|*apikey*|*api_key*|*auth_key*|gpg_*|ssh_*)
       fail 'credential-like keys are forbidden in build_args; use secret mounts'

@@ -435,33 +435,6 @@ runs:
 
 
 
-    - name: Compute explicit metadata from verified release identity
-      id: verifiedmeta
-      if: ${{ steps.customvars.outputs.ok_to_build == 'true' && inputs.verified_release_ref != '' }}
-      shell: bash
-      env:
-        VERIFIED_RELEASE_REF: ${{ inputs.verified_release_ref }}
-        VERIFIED_SOURCE_SHA: ${{ inputs.verified_source_sha }}
-        SELECTED_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub }}
-        REGISTRY_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub_registry }}
-        IMAGE_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub_image }}
-        SELECTED_GHCR: ${{ steps.customvars.outputs.ghcr }}
-        REGISTRY_GHCR: ${{ steps.customvars.outputs.ghcr_registry }}
-        IMAGE_GHCR: ${{ steps.customvars.outputs.ghcr_image }}
-        SELECTED_QUAY: ${{ steps.customvars.outputs.quay }}
-        REGISTRY_QUAY: ${{ steps.customvars.outputs.quay_registry }}
-        IMAGE_QUAY: ${{ steps.customvars.outputs.quay_image }}
-        SELECTED_HARBOR: ${{ steps.customvars.outputs.harbor }}
-        REGISTRY_HARBOR: ${{ steps.customvars.outputs.harbor_registry }}
-        IMAGE_HARBOR: ${{ steps.customvars.outputs.harbor_image }}
-        SELECTED_ECR: ${{ steps.customvars.outputs.ecr }}
-        REGISTRY_ECR: ${{ steps.customvars.outputs.ecr_registry }}
-        IMAGE_ECR: ${{ steps.customvars.outputs.ecr_image }}
-        SELECTED_CUSTOM: ${{ steps.customvars.outputs.custom }}
-        REGISTRY_CUSTOM: ${{ steps.customvars.outputs.custom_registry }}
-        IMAGE_CUSTOM: ${{ steps.customvars.outputs.custom_image }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/verified-release-metadata.bash"
-
       ## Login to DockerHub, GitHub Packages, Quay, Harbor, and Custom registries
     - name: Login to DockerHub
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # pin@v2
@@ -521,6 +494,33 @@ runs:
         username: "${{ inputs.custom_username }}"
         password: "${{ inputs.custom_token }}"
         registry: "${{ steps.customvars.outputs.custom_registry }}"
+
+    - name: Compute explicit metadata from verified release identity
+      id: verifiedmeta
+      if: ${{ steps.customvars.outputs.ok_to_build == 'true' && inputs.verified_release_ref != '' }}
+      shell: bash
+      env:
+        VERIFIED_RELEASE_REF: ${{ inputs.verified_release_ref }}
+        VERIFIED_SOURCE_SHA: ${{ inputs.verified_source_sha }}
+        SELECTED_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub }}
+        REGISTRY_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub_registry }}
+        IMAGE_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub_image }}
+        SELECTED_GHCR: ${{ steps.customvars.outputs.ghcr }}
+        REGISTRY_GHCR: ${{ steps.customvars.outputs.ghcr_registry }}
+        IMAGE_GHCR: ${{ steps.customvars.outputs.ghcr_image }}
+        SELECTED_QUAY: ${{ steps.customvars.outputs.quay }}
+        REGISTRY_QUAY: ${{ steps.customvars.outputs.quay_registry }}
+        IMAGE_QUAY: ${{ steps.customvars.outputs.quay_image }}
+        SELECTED_HARBOR: ${{ steps.customvars.outputs.harbor }}
+        REGISTRY_HARBOR: ${{ steps.customvars.outputs.harbor_registry }}
+        IMAGE_HARBOR: ${{ steps.customvars.outputs.harbor_image }}
+        SELECTED_ECR: ${{ steps.customvars.outputs.ecr }}
+        REGISTRY_ECR: ${{ steps.fetchecr.outputs.ecr_account }}.${{ steps.customvars.outputs.ecr_registry }}
+        IMAGE_ECR: ${{ steps.customvars.outputs.ecr_image }}
+        SELECTED_CUSTOM: ${{ steps.customvars.outputs.custom }}
+        REGISTRY_CUSTOM: ${{ steps.customvars.outputs.custom_registry }}
+        IMAGE_CUSTOM: ${{ steps.customvars.outputs.custom_image }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/verified-release-metadata.bash"
 
     # Set image metadata and tags
     - name: Docker metadata

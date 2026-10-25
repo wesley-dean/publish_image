@@ -337,6 +337,112 @@ jobs:
           ghcr_image: "my-name/awesome-image"
 ```
 
+## Verified release and dual-registry publishing (opt-in)
+
+Existing callers retain the historical behavior when the new inputs are not
+provided. A previously validated tagged-release pipeline (including
+`v0.x.y`) can supply an **explicit** release ref and source SHA; this
+prevents the `workflow_run` event's ambient `main` ref from silently
+controlling release tags.
+
+| Input | Default | Contract |
+| --- | --- | --- |
+| `verified_release_ref` | empty | Exact independently verified `refs/tags/vMAJOR.MINOR.PATCH` |
+| `verified_source_sha` | empty | Independently verified lowercase full 40-character commit SHA |
+| `build_args` | empty | Nonsecret newline-separated `NAME=VALUE` Buildx args |
+| `push` | `true` | Set `false` to build/load locally without registry credentials |
+| `required_registries` | empty | Required names `dockerhub,ghcr` (or a subset) with fail-closed credential checks |
+
+Both verified inputs are required together. Verified mode refuses
+`force_release` and generates **only** the intended tags:
+`latest`, exact version (e.g., `0.2.3`), major/minor (`0.2`), major
+(`0`), short SHA (`sha-abcdef0`), and long SHA (`sha-abcdef0123...`).
+It also writes `org.opencontainers.image.version`,
+`org.opencontainers.image.revision` and
+`org.opencontainers.image.ref.name` from the explicit identity, not from
+the ambient GitHub event. **No `edge` tag** is generated in verified
+mode. Ordinary (unverified-mode) callers continue to use the historical
+docker/metadata-action tag and branch policy.
+
+**Verification boundary:** These inputs do not themselves prove a release
+is genuine. The invoking workflow MUST independently validate the
+successful trusted workflow run, protected source history, signed tag,
+release assets, attestations, exact immutable hashes, and no-push gate
+before granting registry credentials. Never use PR or arbitrary webhook
+strings as verified release authority. The action validates formatting
+and fail-closed selection; it cannot independently authenticate a
+caller-supplied upstream release.
+
+Build arguments are forwarded to `docker/build-push-action` and must be
+**nonsecret**. The action rejects common credential-like key names, but
+cannot recognize secret values disguised as ordinary settings. Never
+place tokens, passwords or GPG keys in args, image labels, metadata
+or logs. certbotbot's required verified build-identity arguments are
+`SOURCE_COMMIT`, `RELEASE_VERSION`, `PRODUCER_SHA256`,
+`HANDOFF_MANIFEST_SHA256`, and `BUILD_KIND=release`. Derive them from
+the validated release artifact handoff, not from a fresh checkout.
+
+### Example downstream invocation after independent release verification
+
+This example is a fragment for a **separate protected release-correlated
+workflow** after its own release validation and exact OCI context
+preparation. The SHA pin for this action must be replaced with the
+reviewed full commit **after** this PR merges.
+
+~~~yaml
+- name: Publish verified certificate producer
+  uses: wesley-dean/publish_image@REPLACE_WITH_REVIEWED_40_CHAR_COMMIT
+  with:
+    github_ref: ${{ github.ref }}
+    repository_name: certbotbot
+    context: ${{ runner.temp }}/verified-oci-context
+    dockerfile: ${{ runner.temp }}/verified-oci-context/Dockerfile
+    platforms: linux/amd64
+    push: 'true'
+    required_registries: dockerhub,ghcr
+    verified_release_ref: ${{ steps.verify-release.outputs.release_ref }}
+    verified_source_sha: ${{ steps.verify-release.outputs.source_sha }}
+    build_args: |
+      SOURCE_COMMIT=${{ steps.verify-release.outputs.source_sha }}
+      RELEASE_VERSION=${{ steps.verify-release.outputs.version }}
+      PRODUCER_SHA256=${{ steps.verify-release.outputs.producer_sha256 }}
+      HANDOFF_MANIFEST_SHA256=${{ steps.verify-release.outputs.manifest_sha256 }}
+      BUILD_KIND=release
+    dockerhub_image: wesleydean/certbotbot
+    dockerhub_username: ${{ secrets.dockerhub_username }}
+    dockerhub_token: ${{ secrets.dockerhub_token }}
+    ghcr_image: wesley-dean/certbotbot
+    ghcr_username: ${{ secrets.ghcr_username }}
+    ghcr_token: ${{ secrets.ghcr_token }}
+~~~
+
+The named `verify-release` step is **illustrative**; this reusable
+action does not create that step, verify release signing, or provide
+registry credentials. For a no-push acceptance build, pass
+`push: 'false'` and the two registry image names without tokens,
+and choose `platforms: linux/amd64`. Registry logins, description
+updates and publication are skipped; one image is loaded locally
+for inspecting its OCI labels and Buildx argument effects.
+A Dockerfile may still require network access to fetch base images.
+See the [no-push contract CI](.github/workflows/publisher-contract.yml).
+
+### Outcomes and limits
+
+With `required_registries: dockerhub,ghcr`, absent credentials for
+either target cause failure **before** any login or build. Both
+targets participate in one Buildx push; an error fails the action.
+Multi-registry publishing is **not transactional**: one destination
+may accept tags even if another push fails. There is no rollback.
+Independently inspect each registry and verify its actual digest,
+platforms, source provenance, tags and SBOM.
+
+The new **nonsecret outputs** are `tags`, `digest`, `release_ref`,
+`source_sha`, `dockerhub_digest_ref` and `ghcr_digest_ref`.
+Digest references are the intended target names paired with the
+Buildx-reported digest; they are **not** remote verification evidence.
+The original enabled-registry/image outputs remain available. Passwords,
+registry tokens, and ECR access keys are never written to step outputs.
+
 ## Questions
 
 ### Why do we need to provide the repo name?

@@ -11,7 +11,7 @@ sha="${VERIFIED_SOURCE_SHA:-}"
 [[ -n "${GITHUB_OUTPUT:-}" ]] || exit 64
 
 version="${ref#refs/tags/v}"
-IFS=. read -r major minor patch <<< "$version"
+IFS=. read -r major minor _unused_patch <<< "$version"
 images=()
 for name in DOCKERHUB GHCR QUAY HARBOR ECR CUSTOM; do
   selected="SELECTED_$name"

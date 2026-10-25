@@ -176,18 +176,18 @@ jobs:
           if grep -q ':edge$' <<< "$TAGS"; then exit 1; fi
           image='ghcr.io/dryrun/certbotbot:0.2.3'
           test "$(docker image inspect "$image" \
-            --format '${{ index .Config.Labels "org.opencontainers.image.revision" }}')" \
+            --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" \
             = 0123456789abcdef0123456789abcdef01234567
           test "$(docker image inspect "$image" \
-            --format '${{ index .Config.Labels "org.opencontainers.image.version" }}')" \
+            --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" \
             = 0.2.3
           test "$(docker image inspect "$image" \
-            --format '${{ index .Config.Labels "test.build_kind" }}')" = release
+            --format '{{ index .Config.Labels "test.build_kind" }}')" = release
           test "$(docker image inspect "$image" \
-            --format '${{ index .Config.Labels "test.source_commit" }}')" \
+            --format '{{ index .Config.Labels "test.source_commit" }}')" \
             = 0123456789abcdef0123456789abcdef01234567
           test "$(docker image inspect "$image" \
-            --format '${{ index .Config.Labels "test.handoff_sha256" }}')" \
+            --format '{{ index .Config.Labels "test.handoff_sha256" }}')" \
             = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
   nonrelease-no-push:

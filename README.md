@@ -424,7 +424,7 @@ and choose `platforms: linux/amd64`. Registry logins, description
 updates and publication are skipped; one image is loaded locally
 for inspecting its OCI labels and Buildx argument effects.
 A Dockerfile may still require network access to fetch base images.
-See the [no-push contract CI](.github/workflows/publisher-contract.yml).
+See the [no-push contract CI](.github/workflows/megalinter.yml).
 
 ### Outcomes and limits
 

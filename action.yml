@@ -15,6 +15,27 @@ inputs:
     description: "Repository name"
     required: true
 
+  verified_release_ref:
+    description: "Caller-verified exact tag ref (refs/tags/vX.Y.Z)"
+    required: false
+    default: ""
+  verified_source_sha:
+    description: "Caller-verified full lowercase source SHA"
+    required: false
+    default: ""
+  build_args:
+    description: "Nonsecret newline-separated Buildx NAME=VALUE arguments"
+    required: false
+    default: ""
+  push:
+    description: "Push images; false enables credential-free build acceptance"
+    required: false
+    default: "true"
+  required_registries:
+    description: "Comma-separated required registries: dockerhub,ghcr"
+    required: false
+    default: ""
+
   dockerfile:
     description: "Path to the Dockerfile to build (defaults to Dockerfile in the build context)"
     required: false
@@ -166,9 +187,43 @@ outputs:
     description: "Custom registry image name"
     value: ${{ steps.customvars.outputs.custom_image }}
 
+  tags:
+    description: "Resulting nonsecret, newline-separated image tags"
+    value: ${{ steps.verifiedmeta.outputs.tags || steps.meta.outputs.tags }}
+  digest:
+    description: "Nonsecret Buildx build digest"
+    value: ${{ steps.build-push.outputs.digest }}
+  release_ref:
+    description: "Validated explicit release ref, when selected"
+    value: ${{ steps.verifiedmeta.outputs.release_ref }}
+  source_sha:
+    description: "Validated explicit source SHA, when selected"
+    value: ${{ steps.verifiedmeta.outputs.source_sha }}
+  dockerhub_digest_ref:
+    description: "Expected Docker Hub digest ref (independent remote verification required)"
+    value: ${{ steps.customvars.outputs.dockerhub == 'true' && steps.build-push.outputs.digest != '' && format('{0}/{1}@{2}', steps.customvars.outputs.dockerhub_registry, steps.customvars.outputs.dockerhub_image, steps.build-push.outputs.digest) || '' }}
+  ghcr_digest_ref:
+    description: "Expected GHCR digest ref (independent remote verification required)"
+    value: ${{ steps.customvars.outputs.ghcr == 'true' && steps.build-push.outputs.digest != '' && format('{0}/{1}@{2}', steps.customvars.outputs.ghcr_registry, steps.customvars.outputs.ghcr_image, steps.build-push.outputs.digest) || '' }}
+
 runs:
   using: "composite"
   steps:
+    - name: Validate opt-in publication inputs without outputting secrets
+      shell: bash
+      env:
+        PUBLISH_IMAGE_PUSH: ${{ inputs.push }}
+        PUBLISH_IMAGE_BUILD_ARGS: ${{ inputs.build_args }}
+        VERIFIED_RELEASE_REF: ${{ inputs.verified_release_ref }}
+        VERIFIED_SOURCE_SHA: ${{ inputs.verified_source_sha }}
+        PUBLISH_FORCE_RELEASE: ${{ inputs.force_release }}
+        REQUIRED_REGISTRIES: ${{ inputs.required_registries }}
+        PUBLISH_DOCKERHUB_USERNAME: ${{ inputs.dockerhub_username }}
+        PUBLISH_DOCKERHUB_TOKEN: ${{ inputs.dockerhub_token }}
+        PUBLISH_GHCR_USERNAME: ${{ inputs.ghcr_username }}
+        PUBLISH_GHCR_TOKEN: ${{ inputs.ghcr_token }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/verify-publisher-inputs.bash"
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # pin@v2
 
@@ -185,6 +240,7 @@ runs:
         inputs_context: ${{ inputs.context }}
         inputs_dockerfile: ${{ inputs.dockerfile }}
         inputs_force_release: ${{ inputs.force_release }}
+        inputs_push: ${{ inputs.push }}
 
         inputs_dockerhub_username: ${{ inputs.dockerhub_username }}
         inputs_dockerhub_token: ${{ inputs.dockerhub_token }}
@@ -227,6 +283,7 @@ runs:
           dockerfile="${inputs_dockerfile}"
 
           force_release="${inputs_force_release}"
+          publish="${inputs_push}"
 
           dockerhub_username="${inputs_dockerhub_username}"
           dockerhub_token="${inputs_dockerhub_token}"
@@ -282,52 +339,56 @@ runs:
           fi
 
           echo -n "dockerhub="
-          if [ -n "${dockerhub_username}" ] \
-          && [ -n "${dockerhub_token}" ] ; then
+          if { [ -n "${dockerhub_username}" ] \
+          && [ -n "${dockerhub_token}" ]; } \
+          || { [ "${publish}" = false ] && [ -n "${dockerhub_image}" ]; }; then
             echo "true"
             echo "dockerhub_image=${dockerhub_image:-${dockerhub_username}/${repository_name}}"
             echo "dockerhub_registry=${dockerhub_registry:-docker.io}"
             echo "dockerhub_username=${dockerhub_username}"
-            echo "dockerhub_token=${dockerhub_token}"
+            # sensitive input dockerhub_token never goes to GITHUB_OUTPUT
             found_credentials="true"
           else
             echo "false"
           fi
 
           echo -n "ghcr="
-          if [ -n "${ghcr_username}" ] \
-          && [ -n "${ghcr_token}" ] ; then
+          if { [ -n "${ghcr_username}" ] \
+          && [ -n "${ghcr_token}" ]; } \
+          || { [ "${publish}" = false ] && [ -n "${ghcr_image}" ]; }; then
             echo "true"
             echo "ghcr_image=${ghcr_image:-${ghcr_username}/${repository_name}}"
             echo "ghcr_registry=${ghcr_registry:-ghcr.io}"
             echo "ghcr_username=${ghcr_username}"
-            echo "ghcr_token=${ghcr_token}"
+            # sensitive input ghcr_token never goes to GITHUB_OUTPUT
             found_credentials="true"
           else
             echo "false"
           fi
 
           echo -n "quay="
-          if [ -n "${quay_username}" ] \
-          && [ -n "${quay_token}" ] ; then
+          if { [ -n "${quay_username}" ] \
+          && [ -n "${quay_token}" ]; } \
+          || { [ "${publish}" = false ] && [ -n "${quay_image}" ]; }; then
             echo "true"
             echo "quay_image=${quay_image:-${quay_username}/${repository_name}}"
             echo "quay_registry=${quay_registry:-quay.io}"
             echo "quay_username=${quay_username}"
-            echo "quay_token=${quay_token}"
+            # sensitive input quay_token never goes to GITHUB_OUTPUT
             found_credentials="true"
           else
             echo "false"
           fi
 
           echo -n "harbor="
-          if [ -n "${harbor_username}" ] \
-          && [ -n "${harbor_token}" ] ; then
+          if { [ -n "${harbor_username}" ] \
+          && [ -n "${harbor_token}" ]; } \
+          || { [ "${publish}" = false ] && [ -n "${harbor_image}" ]; }; then
             echo "true"
             echo "harbor_image=${harbor_image:-${harbor_username}/${repository_name}}"
             echo "harbor_registry=${harbor_registry:-goharbor.io}"
             echo "harbor_username=${harbor_username}"
-            echo "harbor_token=${harbor_token}"
+            # sensitive input harbor_token never goes to GITHUB_OUTPUT
             found_credentials="true"
           else
             echo "false"
@@ -340,8 +401,8 @@ runs:
             echo "true"
             echo "ecr_image=${ecr_image:-${repository_name}}"
             echo "ecr_registry=${ecr_registry:-dkr.ecr.${ecr_region}.amazonaws.com}"
-            echo "ecr_access_key_id=${ecr_access_key_id}"
-            echo "ecr_secret_access_key=${ecr_secret_access_key}"
+            # sensitive input ecr_access_key_id never goes to GITHUB_OUTPUT
+            # sensitive input ecr_secret_access_key never goes to GITHUB_OUTPUT
             echo "ecr_region=${ecr_region}"
             found_credentials="true"
           else
@@ -349,13 +410,14 @@ runs:
           fi
 
           echo -n "custom="
-          if [ -n "${custom_username}" ] \
-          && [ -n "${custom_token}" ] ; then
+          if { [ -n "${custom_username}" ] \
+          && [ -n "${custom_token}" ]; } \
+          || { [ "${publish}" = false ] && [ -n "${custom_image}" ]; }; then
             echo "true"
             echo "custom_image=${custom_image:-${custom_username}/${repository_name}}"
             echo "custom_registry=${custom_registry:-localhost:5000}"
             echo "custom_username=${custom_username}"
-            echo "custom_token=${custom_token}"
+            # sensitive input custom_token never goes to GITHUB_OUTPUT
             found_credentials="true"
           else
             echo "false"
@@ -376,43 +438,43 @@ runs:
       ## Login to DockerHub, GitHub Packages, Quay, Harbor, and Custom registries
     - name: Login to DockerHub
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # pin@v2
-      if: ${{ steps.customvars.outputs.dockerhub == 'true' }}
+      if: ${{ steps.customvars.outputs.dockerhub == 'true' && inputs.push == 'true' }}
       with:
-        username: "${{ steps.customvars.outputs.dockerhub_username }}"
-        password: "${{ steps.customvars.outputs.dockerhub_token }}"
+        username: "${{ inputs.dockerhub_username }}"
+        password: "${{ inputs.dockerhub_token }}"
         registry: "${{ steps.customvars.outputs.dockerhub_registry }}"
 
     - name: Login to GitHub Packages
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # pin@v2
-      if: ${{ steps.customvars.outputs.ghcr == 'true' }}
+      if: ${{ steps.customvars.outputs.ghcr == 'true' && inputs.push == 'true' }}
       with:
-        username: "${{ steps.customvars.outputs.ghcr_username }}"
-        password: "${{ steps.customvars.outputs.ghcr_token }}"
+        username: "${{ inputs.ghcr_username }}"
+        password: "${{ inputs.ghcr_token }}"
         registry: "${{ steps.customvars.outputs.ghcr_registry }}"
 
     - name: Login to Quay
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # pin@v2
-      if: ${{ steps.customvars.outputs.quay == 'true' }}
+      if: ${{ steps.customvars.outputs.quay == 'true' && inputs.push == 'true' }}
       with:
-        username: "${{ steps.customvars.outputs.quay_username }}"
-        password: "${{ steps.customvars.outputs.quay_token }}"
+        username: "${{ inputs.quay_username }}"
+        password: "${{ inputs.quay_token }}"
         registry: "${{ steps.customvars.outputs.quay_registry }}"
 
     - name: Login to Harbor
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # pin@v2
-      if: ${{ steps.customvars.outputs.harbor == 'true' }}
+      if: ${{ steps.customvars.outputs.harbor == 'true' && inputs.push == 'true' }}
       with:
-        username: "${{ steps.customvars.outputs.harbor_username }}"
-        password: "${{ steps.customvars.outputs.harbor_token }}"
+        username: "${{ inputs.harbor_username }}"
+        password: "${{ inputs.harbor_token }}"
         registry: "${{ steps.customvars.outputs.harbor_registry }}"
 
     - name: Login to ECR
       id: ecr
       uses: jwalton/gh-ecr-login@8f09f5bf7451d6b8e3f458240eb4026f9476a18d # pin@v3.0.1
-      if: ${{ steps.customvars.outputs.ecr == 'true' }}
+      if: ${{ steps.customvars.outputs.ecr == 'true' && inputs.push == 'true' }}
       with:
-        access-key-id: "${{ steps.customvars.outputs.ecr_access_key_id }}"
-        secret-access-key: "${{ steps.customvars.outputs.ecr_secret_access_key }}"
+        access-key-id: "${{ inputs.ecr_access_key_id }}"
+        secret-access-key: "${{ inputs.ecr_secret_access_key }}"
         region: "${{ steps.customvars.outputs.ecr_region }}"
 
     - name: Fetch ECR account
@@ -427,16 +489,43 @@ runs:
 
     - name: Login to Custom registry
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # pin@v2
-      if: ${{ steps.customvars.outputs.custom == 'true' }}
+      if: ${{ steps.customvars.outputs.custom == 'true' && inputs.push == 'true' }}
       with:
-        username: "${{ steps.customvars.outputs.custom_username }}"
-        password: "${{ steps.customvars.outputs.custom_token }}"
+        username: "${{ inputs.custom_username }}"
+        password: "${{ inputs.custom_token }}"
         registry: "${{ steps.customvars.outputs.custom_registry }}"
+
+    - name: Compute explicit metadata from verified release identity
+      id: verifiedmeta
+      if: ${{ steps.customvars.outputs.ok_to_build == 'true' && inputs.verified_release_ref != '' }}
+      shell: bash
+      env:
+        VERIFIED_RELEASE_REF: ${{ inputs.verified_release_ref }}
+        VERIFIED_SOURCE_SHA: ${{ inputs.verified_source_sha }}
+        SELECTED_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub }}
+        REGISTRY_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub_registry }}
+        IMAGE_DOCKERHUB: ${{ steps.customvars.outputs.dockerhub_image }}
+        SELECTED_GHCR: ${{ steps.customvars.outputs.ghcr }}
+        REGISTRY_GHCR: ${{ steps.customvars.outputs.ghcr_registry }}
+        IMAGE_GHCR: ${{ steps.customvars.outputs.ghcr_image }}
+        SELECTED_QUAY: ${{ steps.customvars.outputs.quay }}
+        REGISTRY_QUAY: ${{ steps.customvars.outputs.quay_registry }}
+        IMAGE_QUAY: ${{ steps.customvars.outputs.quay_image }}
+        SELECTED_HARBOR: ${{ steps.customvars.outputs.harbor }}
+        REGISTRY_HARBOR: ${{ steps.customvars.outputs.harbor_registry }}
+        IMAGE_HARBOR: ${{ steps.customvars.outputs.harbor_image }}
+        SELECTED_ECR: ${{ steps.customvars.outputs.ecr }}
+        REGISTRY_ECR: ${{ steps.fetchecr.outputs.ecr_account }}.${{ steps.customvars.outputs.ecr_registry }}
+        IMAGE_ECR: ${{ steps.customvars.outputs.ecr_image }}
+        SELECTED_CUSTOM: ${{ steps.customvars.outputs.custom }}
+        REGISTRY_CUSTOM: ${{ steps.customvars.outputs.custom_registry }}
+        IMAGE_CUSTOM: ${{ steps.customvars.outputs.custom_image }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/verified-release-metadata.bash"
 
     # Set image metadata and tags
     - name: Docker metadata
       id: meta
-      if: ${{ steps.customvars.outputs.ok_to_build == 'true' }}
+      if: ${{ steps.customvars.outputs.ok_to_build == 'true' && inputs.verified_release_ref == '' }}
       uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # pin@v5
       with:
         images: |
@@ -464,41 +553,46 @@ runs:
       if: ${{ steps.customvars.outputs.ok_to_build == 'true' }}
       id: build-push
       with:
-        push: true
-        sbom: true
+        push: ${{ inputs.push }}
+        # Load no-push single-platform builds for real local acceptance checks.
+        load: ${{ inputs.push == 'false' && inputs.platforms == 'linux/amd64' }}
+        build-args: ${{ inputs.build_args }}
+        # The local Docker exporter used by no-push acceptance cannot retain SBOM attestations.
+        sbom: ${{ inputs.push }}
         context: ${{ steps.customvars.outputs.context }}
         file: ${{ steps.customvars.outputs.dockerfile }}
         platforms: ${{ steps.customvars.outputs.platforms }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        annotations: ${{ steps.meta.outputs.annotations }}
+        tags: ${{ steps.verifiedmeta.outputs.tags || steps.meta.outputs.tags }}
+        labels: ${{ steps.verifiedmeta.outputs.labels || steps.meta.outputs.labels }}
+        # OCI annotations are emitted for pushed manifests, not Docker local exporter.
+        annotations: ${{ inputs.push == 'true' && (steps.verifiedmeta.outputs.annotations || steps.meta.outputs.annotations) || '' }}
 
     # Update image descriptions (DockerHub, Quay, and Harbor only)
     - name: update DockerHub description
       uses: christian-korneck/update-container-description-action@d36005551adeaba9698d8d67a296bd16fa91f8e8 # pin@v1
-      if: ${{ steps.customvars.outputs.dockerhub == 'true' && steps.customvars.outputs.ok_to_build == 'true' }}
+      if: ${{ steps.customvars.outputs.dockerhub == 'true' && steps.customvars.outputs.ok_to_build == 'true' && inputs.push == 'true' }}
       with:
         destination_container_repo: ${{ steps.customvars.outputs.dockerhub_image }}
         provider: dockerhub
       env:
-        DOCKER_USER: ${{ steps.customvars.outputs.dockerhub_username }}
-        DOCKER_PASS: ${{ steps.customvars.outputs.dockerhub_token }}
+        DOCKER_USER: ${{ inputs.dockerhub_username }}
+        DOCKER_PASS: ${{ inputs.dockerhub_token }}
 
     - name: update Quay description
       uses: christian-korneck/update-container-description-action@d36005551adeaba9698d8d67a296bd16fa91f8e8 # pin@v1
-      if: ${{ steps.customvars.outputs.quay == 'true' && steps.customvars.outputs.ok_to_build == 'true' }}
+      if: ${{ steps.customvars.outputs.quay == 'true' && steps.customvars.outputs.ok_to_build == 'true' && inputs.push == 'true' }}
       with:
         destination_container_repo: ${{ steps.customvars.outputs.quay_image }}
         provider: quay
       env:
-        DOCKER_APIKEY: ${{ steps.customvars.outputs.quay_token }}
+        DOCKER_APIKEY: ${{ inputs.quay_token }}
 
     - name: update Harbor description
       uses: christian-korneck/update-container-description-action@d36005551adeaba9698d8d67a296bd16fa91f8e8 # pin@v1
-      if: ${{ steps.customvars.outputs.harbor == 'true' && steps.customvars.outputs.ok_to_build == 'true' }}
+      if: ${{ steps.customvars.outputs.harbor == 'true' && steps.customvars.outputs.ok_to_build == 'true' && inputs.push == 'true' }}
       with:
         destination_container_repo: ${{ steps.customvars.outputs.harbor_image }}
         provider: harbor2
       env:
-        DOCKER_USER: ${{ steps.customvars.outputs.harbor_username }}
-        DOCKER_PASS: ${{ steps.customvars.outputs.harbor_token }}
+        DOCKER_USER: ${{ inputs.harbor_username }}
+        DOCKER_PASS: ${{ inputs.harbor_token }}

@@ -18,8 +18,6 @@ env:
   APPLY_FIXES: all # When active, APPLY_FIXES must also be defined as environment variable (in github/workflows/mega-linter.yml or other CI tool)
   APPLY_FIXES_EVENT: pull_request # Decide which event triggers application of fixes in a commit or a PR (pull_request, push, all)
   APPLY_FIXES_MODE: commit # If APPLY_FIXES is used, defines if the fixes are directly committed (commit) or posted in a PR (pull_request)
-  GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-  GPG_PRIVATE_KEY_PASSPHRASE: ${{ secrets.GPG_PRIVATE_KEY_PASSPHRASE }}
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
@@ -30,9 +28,6 @@ jobs:
     name: MegaLinter
     runs-on: ubuntu-22.04
     permissions: write-all
-    env:
-      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      GPG_PRIVATE_KEY_PASSPHRASE: ${{ secrets.GPG_PRIVATE_KEY_PASSPHRASE }}
     steps:
       # Git Checkout
       - name: Checkout Code
@@ -54,8 +49,8 @@ jobs:
         uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # pin@v7.0.0
         if: steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'commit' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
-          gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
-          passphrase: ${{ env.GPG_PRIVATE_KEY_PASSPHRASE }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PRIVATE_KEY_PASSPHRASE }}
           git_user_signingkey: true
           git_commit_gpgsign: true
 
@@ -116,3 +111,116 @@ jobs:
         uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # pin@v3.29.5
         with:
           sarif_file: "megalinter-reports/megalinter-report.sarif"
+
+  # #99: contract tests, no credentials, no registry publication.
+  offline:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out proposed action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test inputs, tags, failure and output secrecy
+        shell: bash
+        run: bash tests/publisher-contract.bash
+
+  release-no-push:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out proposed action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Exercise v0 tag from explicit verified event data
+        id: release
+        uses: ./
+        with:
+          github_ref: refs/heads/main
+          repository_name: certbotbot
+          context: tests/fixtures
+          dockerfile: tests/fixtures/Dockerfile
+          platforms: linux/amd64
+          push: 'false'
+          dockerhub_image: dryrun/certbotbot
+          ghcr_image: dryrun/certbotbot
+          verified_release_ref: refs/tags/v0.2.3
+          verified_source_sha: 0123456789abcdef0123456789abcdef01234567
+          build_args: |
+            SOURCE_COMMIT=0123456789abcdef0123456789abcdef01234567
+            RELEASE_VERSION=0.2.3
+            PRODUCER_SHA256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            HANDOFF_MANIFEST_SHA256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+            BUILD_KIND=release
+
+      - name: Inspect the locally loaded image and nonsecret metadata
+        shell: bash
+        env:
+          TAGS: ${{ steps.release.outputs.tags }}
+          RELEASE_REF: ${{ steps.release.outputs.release_ref }}
+          SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$RELEASE_REF" = refs/tags/v0.2.3
+          test "$SOURCE_SHA" = 0123456789abcdef0123456789abcdef01234567
+          grep -Fx 'docker.io/dryrun/certbotbot:latest' <<< "$TAGS"
+          grep -Fx 'ghcr.io/dryrun/certbotbot:0.2.3' <<< "$TAGS"
+          grep -Fx 'ghcr.io/dryrun/certbotbot:sha-0123456' <<< "$TAGS"
+          if grep -q ':edge$' <<< "$TAGS"; then exit 1; fi
+          image='ghcr.io/dryrun/certbotbot:0.2.3'
+          test "$(docker image inspect "$image" \
+            --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" \
+            = 0123456789abcdef0123456789abcdef01234567
+          test "$(docker image inspect "$image" \
+            --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" \
+            = 0.2.3
+          test "$(docker image inspect "$image" \
+            --format '{{ index .Config.Labels "test.build_kind" }}')" = release
+          test "$(docker image inspect "$image" \
+            --format '{{ index .Config.Labels "test.source_commit" }}')" \
+            = 0123456789abcdef0123456789abcdef01234567
+          test "$(docker image inspect "$image" \
+            --format '{{ index .Config.Labels "test.handoff_sha256" }}')" \
+            = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+  nonrelease-no-push:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out proposed action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Exercise legacy nonrelease metadata without credentials
+        id: branch
+        uses: ./
+        with:
+          github_ref: refs/heads/main
+          repository_name: certbotbot
+          context: tests/fixtures
+          dockerfile: tests/fixtures/Dockerfile
+          platforms: linux/amd64
+          push: 'false'
+          dockerhub_image: dryrun/certbotbot
+          ghcr_image: dryrun/certbotbot
+          build_args: |
+            SOURCE_COMMIT=0123456789abcdef0123456789abcdef01234567
+            BUILD_KIND=local
+
+      - name: Reject release-only tags in nonrelease context
+        shell: bash
+        env:
+          TAGS: ${{ steps.branch.outputs.tags }}
+          RELEASE_REF: ${{ steps.branch.outputs.release_ref }}
+        run: |
+          set -euo pipefail
+          test -z "$RELEASE_REF"
+          test -n "$TAGS"
+          if grep -Eq ':(latest|0\.2\.3|0\.2|0)$' <<< "$TAGS"; then
+            printf '%s\n' 'Nonrelease selected a release tag' >&2
+            exit 1
+          fi

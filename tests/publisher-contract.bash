@@ -32,6 +32,10 @@ must_fail env -i PATH="$PATH" VERIFIED_RELEASE_REF=refs/tags/v0.2.3 \
   VERIFIED_SOURCE_SHA=bad bash "$validate"
 must_fail env -i PATH="$PATH" VERIFIED_RELEASE_REF=refs/tags/v0.2.3 \
   VERIFIED_SOURCE_SHA="$sha" PUBLISH_FORCE_RELEASE=true bash "$validate"
+must_fail env -i PATH="$PATH" VERIFIED_RELEASE_REF=refs/tags/v0.2.3 \
+  VERIFIED_SOURCE_SHA="$sha" PUBLISH_IMAGE_BUILD_ARGS='SOURCE_COMMIT=deadbeef' bash "$validate"
+must_fail env -i PATH="$PATH" VERIFIED_RELEASE_REF=refs/tags/v0.2.3 \
+  VERIFIED_SOURCE_SHA="$sha" PUBLISH_IMAGE_BUILD_ARGS='RELEASE_VERSION=0.2.4' bash "$validate"
 must_fail env -i PATH="$PATH" PUBLISH_IMAGE_BUILD_ARGS='DOCKERHUB_TOKEN=secret' bash "$validate"
 must_fail env -i PATH="$PATH" PUBLISH_IMAGE_BUILD_ARGS='GPG_SYMMETRIC_KEY=secret' bash "$validate"
 must_fail env -i PATH="$PATH" PUBLISH_IMAGE_BUILD_ARGS='bad key=x' bash "$validate"

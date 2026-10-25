@@ -76,6 +76,8 @@ for key in dockerhub_token ghcr_token quay_token harbor_token custom_token ecr_s
     die "credential read from step output: $key"
   fi
 done
+# The expression is literal GitHub Actions syntax, not Bash expansion.
+# shellcheck disable=SC2016
 must_contain 'build-args: ${{ inputs.build_args }}' action.yml
 must_contain 'type=edge,branch=main' action.yml
 printf '%s\n' 'Publisher contract offline checks passed'

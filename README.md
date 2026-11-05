@@ -45,8 +45,10 @@ The action will add OCI metadata to the image, including the following:
 
 #### Image Descriptions
 
-The action will also update the description of the image on DockerHub, Quay,
-and Harbor using the README.md file in the repository.
+The action also updates image descriptions on Docker Hub, Quay, and Harbor
+using the repository's root `README.md`. Docker Hub limits its full
+description to **25,000 bytes**. See [Image descriptions](#image-descriptions)
+for size checks and failure behavior.
 
 #### Image Attestations
 
@@ -551,8 +553,27 @@ Images that are not associated with a release are given the following tags:
 
 ### Image descriptions
 
-For images on DockerHub, Quay, and Harbor, the action updates the description
-of the image using the README.md file in the repository.
+For Docker Hub, Quay, and Harbor, the action updates the image's full
+description using the checked-out repository's root `README.md`.
+
+**Docker Hub limits `full_description` to 25,000 bytes**, not 25,000
+characters. Count the actual file bytes before publishing:
+
+```bash
+wc -c < README.md
+```
+
+Keep the README comfortably below the limit. Move longer walkthroughs into
+separate Markdown files linked from the root README. This action currently
+does not expose an input for selecting a different description file.
+
+The description update occurs **after** the image build and registry push.
+If Docker Hub rejects an oversized description (HTTP 400), the action fails
+even though image tags may already have been pushed to Docker Hub and other
+registries. That failure does **not** roll back published images. Inspect
+the actual registry manifests and digests independently before retrying or
+declaring a release published. This byte limit is specific to Docker Hub;
+do not assume Quay or Harbor use the same limit.
 
 ### What if I need to override the image's labels?  Customize build parameters?
 

@@ -526,7 +526,7 @@ runs:
     - name: Docker metadata
       id: meta
       if: ${{ steps.customvars.outputs.ok_to_build == 'true' && inputs.verified_release_ref == '' }}
-      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # pin@v5
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # pin@v6.2.0
       with:
         images: |
           name=${{ steps.customvars.outputs.dockerhub_registry }}/${{ steps.customvars.outputs.dockerhub_image }},enable=${{ steps.customvars.outputs.dockerhub == 'true' }}

@@ -31,7 +31,7 @@ jobs:
     steps:
       # Git Checkout
       - name: Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pin@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.PAT || secrets.GITHUB_TOKEN || github.token }}
           fetch-depth: 1
@@ -39,14 +39,14 @@ jobs:
       # MegaLinter
       - name: MegaLinter
         id: ml
-        uses: oxsecurity/megalinter/flavors/security@f2fe8c1cba37091848df3e524066c8c23ef353ed # pin@v10.2.0
+        uses: oxsecurity/megalinter/flavors/security@f2fe8c1cba37091848df3e524066c8c23ef353ed # v10.2.0
         env:
           VALIDATE_ALL_CODEBASE: false
           GITHUB_TOKEN: ${{ secrets.PAT || secrets.GITHUB_TOKEN || github.token }}
 
       - name: "Import GPG key"
         id: import-gpg
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # pin@v7.0.0
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         if: steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'commit' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -57,7 +57,7 @@ jobs:
       # Upload MegaLinter artifacts
       - name: Archive production artifacts
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # pin@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: MegaLinter reports
           path: |
@@ -68,7 +68,7 @@ jobs:
       - name: Create Pull Request with applied fixes
         id: cpr
         if: steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'pull_request' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # pin@v5
+        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # v8.1.2
         with:
           token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
           commit-message: "[MegaLinter] Apply linters automatic fixes"
@@ -90,7 +90,7 @@ jobs:
 
       - name: Commit and push applied linter fixes
         if: steps.ml.outputs.has_updated_sources == 1 && (env.APPLY_FIXES_EVENT == 'all' || env.APPLY_FIXES_EVENT == github.event_name) && env.APPLY_FIXES_MODE == 'commit' && github.ref != 'refs/heads/main' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # pin@v5
+        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7.2.1
         with:
           branch: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
           commit_message: "[MegaLinter] Apply linters fixes"
@@ -100,7 +100,7 @@ jobs:
 
       - name: Check to see if the SARIF a was generated
         id: sarif_file_exists
-        uses: andstor/file-existence-action@558493d6c74bf472d87c84eab196434afc2fa029 # pin@v3.1.0
+        uses: andstor/file-existence-action@558493d6c74bf472d87c84eab196434afc2fa029 # v3.1.0
         with:
           files: "megalinter-reports/megalinter-report.sarif"
 
@@ -108,7 +108,7 @@ jobs:
       # repository is public (private / internal repos likely don't have GHAS)
       - name: Upload MegaLinter scan results to GitHub Security tab
         if: steps.sarif_file_exists.outputs.files_exists == 'true' && github.event.repository.visibility == 'public'
-        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # pin@v3.29.5
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: "megalinter-reports/megalinter-report.sarif"
 

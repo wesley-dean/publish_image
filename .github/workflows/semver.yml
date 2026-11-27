@@ -21,14 +21,14 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # pin@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: calculate version
         id: calculate-version
-        uses: bitshifted/git-auto-semver@c4e8f005e839f822325356f141939cf6c76b5701 # pin@v1
+        uses: bitshifted/git-auto-semver@c4e8f005e839f822325356f141939cf6c76b5701 # v2.0.11
         with:
           create_tag: true
           initial_version: 0.0.1
@@ -40,14 +40,14 @@ jobs:
 
       - name: Generate release notes
         id: release-notes
-        uses: RedCrafter07/release-notes-action@304edb57ff4d0cb822b39a00556c015790dee977 # pin@v1.0.2
+        uses: RedCrafter07/release-notes-action@304edb57ff4d0cb822b39a00556c015790dee977 # v1.0.2
         with:
           tag-name: "${{ steps.calculate-version.outputs.version-string }}"
           token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Create release
         id: create-release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # pin@v2.5.0
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
           release_name: "${{ steps.calculate-version.outputs.version-string }}"

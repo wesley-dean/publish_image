@@ -600,3 +600,18 @@ other with respect, compassion, and empathy, especially when you disagree.
 ## Authors
 
 - Wes Dean
+
+## Dependency maintenance
+
+Routine GitHub Actions version updates are managed by the centrally
+hosted Jenkins Renovate service, explicitly enrolled with root
+`renovate.json`. Scheduled Dependabot routine version PRs are disabled
+through `open-pull-requests-limit: 0`; independent Dependabot security
+updates and vulnerability alerts remain available under GitHub settings.
+The existing bot-specific non-major auto-merge workflow is retained for
+security-related Dependabot PRs only, with required checks and human
+code-owner approval still governing Renovate.
+
+This configuration does not change image publishing authority, SBOM
+attestations, OCI metadata, secrets, registry credentials, or application
+build behavior. Routine Dependabot PRs are retired with migration links.
